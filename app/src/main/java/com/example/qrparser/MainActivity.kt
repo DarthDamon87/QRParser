@@ -138,7 +138,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Pozycje 8..25 liczone OD LEWEJ (1‑indeksowane) z offsetem:
-        val OFFSET_FROM_LEFT = 5
+        val OFFSET_FROM_LEFT = 6
 
         val results = mutableListOf<String>()
         for (i in 8..25) {
