@@ -34,7 +34,7 @@ class MainActivity : AppCompatActivity() {
         "7C0.008.103.B", // 16
         "7C0.008.103.C", // 17
         "7CA.008.088",   // 18
-        "7CA.008.008.A", // 19
+        "7CA.008.008.A", // 19 (jeśli powinno być 7CA.008.088.A — daj znać)
         "7LE.008.084",   // 20
         "7CA.008.088.C", // 21
         "7C0.008.106",   // 22
@@ -137,14 +137,12 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Pozycje 8..25 liczone OD LEWEJ (1‑indeksowane).
-        // Aby z Twojego przykładu „11” trafiło w 15 i 16 (a nie 10 i 11), stosujemy stały offset:
-        // i -> idx = i - OFFSET_FROM_LEFT (bez -1, bo pozycje są 1‑indeksowane).
+        // Pozycje 8..25 liczone OD LEWEJ (1‑indeksowane) z offsetem:
         val OFFSET_FROM_LEFT = 5
 
         val results = mutableListOf<String>()
         for (i in 8..25) {
-            val idx = i - OFFSET_FROM_LEFT
+            val idx = i - OFFSET_FROM_LEFT  // i (1‑indeksowane) -> indeks w stringu (0‑indeksowany)
             if (idx in bitString.indices && bitString[idx] == '1') {
                 val mapIdx = i - 7 // 8->0 ... 25->17
                 if (mapIdx in mapping.indices) {
@@ -153,36 +151,50 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Tekst wyników
+        // Tekst wyników (diagnostyka)
         tvVariants.text = if (results.isEmpty()) {
             "Brak dopasowań (w pozycjach 8-25 nie ma '1')."
         } else {
             results.joinToString(separator = "\n")
         }
 
-        // ====== WYŚWIETLANIE WIELU ZDJĘĆ (jedno pod drugim) ======
-        // Z linii "i: KOD" wyciągamy kody i mapujemy do zasobów; bez duplikatów, w kolejności.
-        val imageResList: List<Int> = results.mapNotNull { line ->
+        // ====== KARTY: ETYKIETA + OBRAZ (wiele, jedno pod drugim) ======
+        // Z linii "i: KOD" wyciągamy pary (label, resId) i renderujemy karty.
+        data class Card(val label: String, val resId: Int)
+
+        val cards: List<Card> = results.mapNotNull { line ->
             val code = line.substringAfter(": ").trim()
-            imageByCode[code]
-        }.distinct()
+            val resId = imageByCode[code] ?: return@mapNotNull null
+            Card(label = line, resId = resId)
+        }
 
         imgContainer.removeAllViews()
-        if (imageResList.isNotEmpty()) {
+        if (cards.isNotEmpty()) {
             imgContainer.visibility = View.VISIBLE
-            for (resId in imageResList) {
+
+            for (card in cards) {
+                // Etykieta (nazwa wycięcia nad obrazem)
+                val labelView = TextView(this).apply {
+                    text = card.label
+                    textSize = 16f
+                    setPadding(0, dp(4), 0, dp(4))
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                }
+                imgContainer.addView(labelView)
+
+                // Obraz
                 val iv = ImageView(this).apply {
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                     ).also { lp ->
                         if (lp is LinearLayout.LayoutParams) {
-                            lp.setMargins(0, dp(8), 0, dp(8))
+                            lp.setMargins(0, 0, 0, dp(12)) // odstęp po obrazku
                         }
                     }
                     adjustViewBounds = true
                     scaleType = ImageView.ScaleType.FIT_CENTER
-                    setImageResource(resId)
+                    setImageResource(card.resId)
                 }
                 imgContainer.addView(iv)
             }
