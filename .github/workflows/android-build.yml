@@ -1,14 +1,16 @@
-name: Build Android APK
+name: Build Android APK (generate wrapper + build)
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
@@ -20,12 +22,28 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Make Gradle wrapper executable
+      # Zainstaluj Gradle na runnerze (gdy nie mamy wrappera w repo)
+      - name: Setup Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+
+      # 1) Wygeneruj Gradle Wrapper w bieżącym repo (tylko w runie CI)
+      - name: Generate Gradle Wrapper
+        run: |
+          gradle wrapper --gradle-version 8.7
+          ls -la
+          test -f gradlew || (echo "Wrapper not generated!" && exit 1)
+
+      # 2) Nadaj uprawnienia wykonywalne wrapperowi
+      - name: Make wrapper executable
         run: chmod +x ./gradlew
 
+      # 3) Zbuduj debug APK wrapperem
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace
 
+      # 4) Opublikuj APK jako artifact do pobrania
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
