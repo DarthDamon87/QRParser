@@ -41,7 +41,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Nagłówek listy wyników: WYCIĘCIA (większa czcionka) -->
+    <!-- Nagłówek sekcji obrazów -->
     <TextView
         android:id="@+id/tvVariantsHeader"
         android:layout_width="wrap_content"
@@ -53,7 +53,19 @@
         app:layout_constraintTop_toBottomOf="@id/tvSequence"
         app:layout_constraintStart_toStartOf="parent" />
 
-    <!-- Lista wyników (większa czcionka) -->
+    <!-- NOWE: kontener na wiele obrazów (pionowo) -->
+    <LinearLayout
+        android:id="@+id/imgContainer"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:layout_marginTop="12dp"
+        app:layout_constraintTop_toBottomOf="@id/tvVariantsHeader"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Lista wyników (teksty) -->
     <TextView
         android:id="@+id/tvVariants"
         android:layout_width="0dp"
@@ -61,7 +73,7 @@
         android:text="-"
         android:textSize="18sp"
         android:lineSpacingExtra="4dp"
-        app:layout_constraintTop_toBottomOf="@id/tvVariantsHeader"
+        app:layout_constraintTop_toBottomOf="@id/imgContainer"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toBottomOf="parent" />
