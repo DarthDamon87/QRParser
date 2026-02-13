@@ -30,7 +30,7 @@ class MainActivity : AppCompatActivity() {
         "7C0.008.103.B", // 16
         "7C0.008.103.C", // 17
         "7CA.008.088",   // 18
-        "7CA.008.008.A", // 19 (zgodnie z Twoją tabelą)
+        "7CA.008.008.A", // 19 (zgodnie z Twoją tabelą; jeśli to literówka, podmienimy na 7CA.008.088.A)
         "7LE.008.084",   // 20
         "7CA.008.088.C", // 21
         "7C0.008.106",   // 22
@@ -39,7 +39,7 @@ class MainActivity : AppCompatActivity() {
         "7C5.008.085"    // 25
     )
 
-    // Launcher ZXing
+    // ZXing launcher
     private val barcodeLauncher = registerForActivityResult(ScanContract()) { result: ScanIntentResult ->
         if (result.contents == null) {
             tvSequence.text = "-"
@@ -62,7 +62,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Blokadę orientacji mamy w AndroidManifest.xml:
+        // Blokada orientacji jest w AndroidManifest.xml:
         // <activity ... android:screenOrientation="portrait" />
         setContentView(R.layout.activity_main)
 
@@ -100,7 +100,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleScannedText(raw: String) {
-        // Przykład: V111_0010000000000000000000_5_015800
+        // Przykład formatu: V111_0010000000000000000000_5_015800
         val parts = raw.trim().split('_')
 
         if (parts.size < 4) {
@@ -122,14 +122,16 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Liczymy pozycje 8..25 OD LEWEJ strony.
-        // Przy 22 znakach faktycznie sprawdzimy 8..22 (23..25 już nie istnieją).
-        val results = mutableListOf<String>()
-        val endPos = minOf(25, bitString.length)
+        // --- KLUCZOWE: stały offset względem LEWEJ krawędzi, aby mapowanie 8..25 zgadzało się z Twoją tabelą.
+        // Dla przykładu: "0000000001100000000001" -> chcemy 15 i 16 (a nie 10 i 11),
+        // co implikuje OFFSET_FROM_LEFT = 4 (pos 15 -> idx 10, pos 16 -> idx 11).
+        val OFFSET_FROM_LEFT = 4
 
-        for (i in 8..endPos) {
-            val idx = i - 1 // 0-based
-            if (bitString[idx] == '1') {
+        val results = mutableListOf<String>()
+        for (i in 8..25) {
+            val idx = (i - 1) - OFFSET_FROM_LEFT // pozycja i (od lewej) -> indeks w bitString z offsetem
+
+            if (idx in bitString.indices && bitString[idx] == '1') {
                 val mapIdx = i - 8 // 8->0 ... 25->17
                 if (mapIdx in mapping.indices) {
                     results.add("$i: ${mapping[mapIdx]}")
