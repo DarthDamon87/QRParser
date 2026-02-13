@@ -1,68 +1,149 @@
-<?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:padding="16dp">
+package com.example.qrparser
 
-    <!-- Przycisk skanowania -->
-    <Button
-        android:id="@+id/btnScan"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:text="Skanuj QR"
-        android:textSize="18sp"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.widget.Button
+import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanIntentResult
+import com.journeyapps.barcodescanner.ScanOptions
 
-    <!-- Etykieta numeru sekwencji -->
-    <TextView
-        android:id="@+id/tvSequenceHeader"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Numer sekwencji:"
-        android:textStyle="bold"
-        android:textSize="18sp"
-        android:layout_marginTop="24dp"
-        app:layout_constraintTop_toBottomOf="@id/btnScan"
-        app:layout_constraintStart_toStartOf="parent" />
+class MainActivity : AppCompatActivity() {
 
-    <!-- Wartość numeru sekwencji (większa czcionka) -->
-    <TextView
-        android:id="@+id/tvSequence"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:text="-"
-        android:textStyle="bold"
-        android:textSize="28sp"
-        app:layout_constraintTop_toBottomOf="@id/tvSequenceHeader"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+    private lateinit var tvSequence: TextView
+    private lateinit var tvVariants: TextView
 
-    <!-- Nagłówek listy wyników: WYCIĘCIA: (większa czcionka) -->
-    <TextView
-        android:id="@+id/tvVariantsHeader"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="WYCIĘCIA:"
-        android:textStyle="bold"
-        android:textSize="20sp"
-        android:layout_marginTop="24dp"
-        app:layout_constraintTop_toBottomOf="@id/tvSequence"
-        app:layout_constraintStart_toStartOf="parent" />
+    // Mapa pozycji 8..25 -> symbol (18 pozycji)
+    private val mapping: List<String> = listOf(
+        "7C0.008.081",   // 8
+        "7C0.008.082",   // 9
+        "7C0.008.083",   // 10
+        "7C0.008.083.A", // 11
+        "7C0.008.084",   // 12
+        "7C0.008.084.A", // 13
+        "7C0.008.103",   // 14
+        "7C0.008.103.A", // 15
+        "7C0.008.103.B", // 16
+        "7C0.008.103.C", // 17
+        "7CA.008.088",   // 18
+        "7CA.008.008.A", // 19 (zgodnie z Twoją tabelą)
+        "7LE.008.084",   // 20
+        "7CA.008.088.C", // 21
+        "7C0.008.106",   // 22
+        "7C0.008.106.A", // 23
+        "7C4.008.085",   // 24
+        "7C5.008.085"    // 25
+    )
 
-    <!-- Lista wyników (większa czcionka) -->
-    <TextView
-        android:id="@+id/tvVariants"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:text="-"
-        android:textSize="18sp"
-        app:layout_constraintTop_toBottomOf="@id/tvVariantsHeader"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent" />
+    // Launcher ZXing
+    private val barcodeLauncher = registerForActivityResult(ScanContract()) { result: ScanIntentResult ->
+        if (result.contents == null) {
+            tvSequence.text = "-"
+            tvVariants.text = "Anulowano lub brak danych."
+        } else {
+            handleScannedText(result.contents)
+        }
+    }
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+    // Uprawnienie do kamery
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            startScan()
+        } else {
+            tvVariants.text = "Brak uprawnienia do kamery."
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // Blokadę orientacji mamy w AndroidManifest.xml:
+        // <activity ... android:screenOrientation="portrait" />
+        setContentView(R.layout.activity_main)
+
+        val btnScan = findViewById<Button>(R.id.btnScan)
+        tvSequence = findViewById(R.id.tvSequence)
+        tvVariants = findViewById(R.id.tvVariants)
+
+        btnScan.setOnClickListener {
+            ensureCameraAndScan()
+        }
+    }
+
+    private fun ensureCameraAndScan() {
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (granted) {
+            startScan()
+        } else {
+            requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    private fun startScan() {
+        val options = ScanOptions().apply {
+            setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+            setPrompt("Nakieruj aparat na kod QR")
+            setBeepEnabled(true)
+            setCameraId(0)
+            setOrientationLocked(true) // blokada widoku skanera (dodatkowo)
+        }
+        barcodeLauncher.launch(options)
+    }
+
+    private fun handleScannedText(raw: String) {
+        // Przykład formatu: V111_0010000000000000000000_5_015800
+        // Rozbijamy po "_" – prościej i odporniej na nietypowe wklejki.
+        val parts = raw.trim().split('_')
+
+        if (parts.size < 4) {
+            tvSequence.text = "-"
+            tvVariants.text = "Nieprawidłowy format: $raw"
+            return
+        }
+
+        val bitString = parts[1].trim()   // 22 znaki 0/1 (pozycje 1..22)
+        val seq6 = parts.last().trim()    // 6 cyfr sekwencji
+
+        // Sekwencja: ostatnie 4 cyfry, bez wiodących zer
+        val seq4 = seq6.takeLast(4).trimStart('0').ifEmpty { "0" }
+        tvSequence.text = seq4
+
+        // Walidacja segmentu bitów (22 znaki 0/1)
+        if (bitString.length != 22 || bitString.any { it != '0' && it != '1' }) {
+            tvVariants.text = "Błędny segment bitów (oczekiwane 22 znaki 0/1): $bitString"
+            return
+        }
+
+        // Liczymy pozycje 8..25 od PRAWEJ strony bitString (LSB po prawej):
+        // 8 -> ostatni znak, 9 -> przedostatni, ... 25 -> 18-ty od prawej.
+        val results = mutableListOf<String>()
+        for (pos in 8..25) {
+            val mapIdx = pos - 8
+            if (mapIdx !in mapping.indices) continue
+
+            val localBitNo = pos - 7                 // 8->1, 9->2, ..., 25->18
+            val idxFromRight = bitString.length - localBitNo // 21..4 (0-based w stringu długości 22)
+            val bitIsOne = idxFromRight in bitString.indices && bitString[idxFromRight] == '1'
+
+            if (bitIsOne) {
+                results.add("$pos: ${mapping[mapIdx]}")
+            }
+        }
+
+        tvVariants.text = if (results.isEmpty()) {
+            "Brak dopasowań (w pozycjach 8-25 nie ma '1')."
+        } else {
+            results.joinToString(separator = "\n")
+        }
+    }
+}
