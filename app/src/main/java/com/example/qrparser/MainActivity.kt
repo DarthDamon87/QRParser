@@ -30,7 +30,7 @@ class MainActivity : AppCompatActivity() {
         "7C0.008.103.B", // 16
         "7C0.008.103.C", // 17
         "7CA.008.088",   // 18
-        "7CA.008.008.A", // 19 (zgodnie z Twoją tabelą)
+        "7CA.008.008.A", // 19
         "7LE.008.084",   // 20
         "7CA.008.088.C", // 21
         "7C0.008.106",   // 22
@@ -62,7 +62,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         // Blokadę orientacji mamy w AndroidManifest.xml:
         // <activity ... android:screenOrientation="portrait" />
         setContentView(R.layout.activity_main)
@@ -76,74 +75,3 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun ensureCameraAndScan() {
-        val granted = ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.CAMERA
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (granted) {
-            startScan()
-        } else {
-            requestPermissionLauncher.launch(Manifest.permission.CAMERA)
-        }
-    }
-
-    private fun startScan() {
-        val options = ScanOptions().apply {
-            setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-            setPrompt("Nakieruj aparat na kod QR")
-            setBeepEnabled(true)
-            setCameraId(0)
-            setOrientationLocked(true) // blokada widoku skanera (dodatkowo)
-        }
-        barcodeLauncher.launch(options)
-    }
-
-    private fun handleScannedText(raw: String) {
-        // Przykład formatu: V111_0010000000000000000000_5_015800
-        // Rozbijamy po "_" – prościej i odporniej na nietypowe wklejki.
-        val parts = raw.trim().split('_')
-
-        if (parts.size < 4) {
-            tvSequence.text = "-"
-            tvVariants.text = "Nieprawidłowy format: $raw"
-            return
-        }
-
-        val bitString = parts[1].trim()   // 22 znaki 0/1 (pozycje 1..22)
-        val seq6 = parts.last().trim()    // 6 cyfr sekwencji
-
-        // Sekwencja: ostatnie 4 cyfry, bez wiodących zer
-        val seq4 = seq6.takeLast(4).trimStart('0').ifEmpty { "0" }
-        tvSequence.text = seq4
-
-        // Walidacja segmentu bitów (22 znaki 0/1)
-        if (bitString.length != 22 || bitString.any { it != '0' && it != '1' }) {
-            tvVariants.text = "Błędny segment bitów (oczekiwane 22 znaki 0/1): $bitString"
-            return
-        }
-
-        // Liczymy pozycje 8..25 od PRAWEJ strony bitString (LSB po prawej):
-        // 8 -> ostatni znak, 9 -> przedostatni, ... 25 -> 18-ty od prawej.
-        val results = mutableListOf<String>()
-        for (pos in 8..25) {
-            val mapIdx = pos - 8
-            if (mapIdx !in mapping.indices) continue
-
-            val localBitNo = pos - 7                 // 8->1, 9->2, ..., 25->18
-            val idxFromRight = bitString.length - localBitNo // 21..4 (0-based w stringu długości 22)
-            val bitIsOne = idxFromRight in bitString.indices && bitString[idxFromRight] == '1'
-
-            if (bitIsOne) {
-                results.add("$pos: ${mapping[mapIdx]}")
-            }
-        }
-
-        tvVariants.text = if (results.isEmpty()) {
-            "Brak dopasowań (w pozycjach 8-25 nie ma '1')."
-        } else {
-            results.joinToString(separator = "\n")
-        }
-    }
-}
