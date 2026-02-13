@@ -1,4 +1,3 @@
-
 package com.example.qrparser
 
 import android.Manifest
@@ -18,7 +17,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvSequence: TextView
     private lateinit var tvVariants: TextView
 
-    // Mapa pozycji 8..25 → symbol
+    // Mapa pozycji 8..25 -> symbol (18 pozycji)
     private val mapping: List<String> = listOf(
         "7C0.008.081",   // 8
         "7C0.008.082",   // 9
@@ -31,7 +30,7 @@ class MainActivity : AppCompatActivity() {
         "7C0.008.103.B", // 16
         "7C0.008.103.C", // 17
         "7CA.008.088",   // 18
-        "7CA.008.008.A", // 19 (zgodnie z listą użytkownika)
+        "7CA.008.008.A", // 19 (zgodnie z Twoją tabelą)
         "7LE.008.084",   // 20
         "7CA.008.088.C", // 21
         "7C0.008.106",   // 22
@@ -40,6 +39,7 @@ class MainActivity : AppCompatActivity() {
         "7C5.008.085"    // 25
     )
 
+    // Launcher ZXing
     private val barcodeLauncher = registerForActivityResult(ScanContract()) { result: ScanIntentResult ->
         if (result.contents == null) {
             tvSequence.text = "-"
@@ -49,10 +49,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Uprawnienie do kamery
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        if (isGranted) startScan() else {
+        if (isGranted) {
+            startScan()
+        } else {
             tvVariants.text = "Brak uprawnienia do kamery."
         }
     }
@@ -65,13 +68,22 @@ class MainActivity : AppCompatActivity() {
         tvSequence = findViewById(R.id.tvSequence)
         tvVariants = findViewById(R.id.tvVariants)
 
-        btnScan.setOnClickListener { ensureCameraAndScan() }
+        btnScan.setOnClickListener {
+            ensureCameraAndScan()
+        }
     }
 
     private fun ensureCameraAndScan() {
-        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
-                PackageManager.PERMISSION_GRANTED
-        if (granted) startScan() else requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (granted) {
+            startScan()
+        } else {
+            requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
     }
 
     private fun startScan() {
@@ -86,38 +98,31 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleScannedText(raw: String) {
-        // Oczekiwany format: V<digits>_<22x[0/1]>_<1 digit>_<6 digits>
-        val regex = Regex("""^V
-?\d+_([01]{22})_
-?(
-?\d)_([0-9]{6})$""")
+        // Oczekiwany przykład: V111_0010000000000000000000_5_015800
+        // Rozbijamy po "_" bez skomplikowanych regexów (prościej i odporniej na wklejki).
+        val parts = raw.trim().split('_')
 
-        // Najpierw spróbuj dopasować ścisły format; jeśli się nie uda, użyj fallbacku split('_')
-        val parsed = regex.matchEntire(raw)
-        val (bitString, seq6) = if (parsed != null) {
-            val bits = parsed.groupValues[1]
-            val seq = parsed.groupValues[3]
-            Pair(bits, seq)
-        } else {
-            val parts = raw.split('_')
-            if (parts.size >= 4) Pair(parts[1], parts.last()) else {
-                tvSequence.text = "-"
-                tvVariants.text = "Nieprawidłowy format: $raw"
-                return
-            }
+        if (parts.size < 4) {
+            tvSequence.text = "-"
+            tvVariants.text = "Nieprawidłowy format: $raw"
+            return
         }
 
-        // Numer sekwencji: ostatnie 4 cyfry
+        val bitString = parts[1].trim()   // 22 znaki 0/1
+        val seq6 = parts.last().trim()    // 6 cyfr
+
+        // Sekwencja: ostatnie 4 cyfry, bez wiodących zer
         val seq4 = seq6.takeLast(4).trimStart('0').ifEmpty { "0" }
         tvSequence.text = seq4
 
-        // Walidacja segmentu bitów
+        // Walidacja segmentu bitów (22 znaki 0/1)
         if (bitString.length != 22 || bitString.any { it != '0' && it != '1' }) {
             tvVariants.text = "Błędny segment bitów (oczekiwane 22 znaki 0/1): $bitString"
             return
         }
 
         val results = mutableListOf<String>()
+        // Pozycje 8..25 (indeksy 7..24)
         for (pos in 8..25) {
             val idx = pos - 1
             if (idx in bitString.indices && bitString[idx] == '1') {
@@ -129,10 +134,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         tvVariants.text = if (results.isEmpty()) {
-            "Brak dopasowań (w pozycjach 8–25 nie ma '1')."
+            "Brak dopasowań (w pozycjach 8-25 nie ma '1')."
         } else {
-            results.joinToString("
-")
+            results.joinToString(separator = "\n")
         }
     }
 }
