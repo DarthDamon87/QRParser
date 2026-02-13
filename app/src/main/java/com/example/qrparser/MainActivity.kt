@@ -30,7 +30,7 @@ class MainActivity : AppCompatActivity() {
         "7C0.008.103.B", // 16
         "7C0.008.103.C", // 17
         "7CA.008.088",   // 18
-        "7CA.008.008.A", // 19 (zgodnie z Twoją tabelą; jeśli to literówka, podmienimy na 7CA.008.088.A)
+        "7CA.008.008.A", // 19
         "7LE.008.084",   // 20
         "7CA.008.088.C", // 21
         "7C0.008.106",   // 22
@@ -132,7 +132,7 @@ class MainActivity : AppCompatActivity() {
             val idx = (i - 1) - OFFSET_FROM_LEFT // pozycja i (od lewej) -> indeks w bitString z offsetem
 
             if (idx in bitString.indices && bitString[idx] == '1') {
-                val mapIdx = i - 8 // 8->0 ... 25->17
+                val mapIdx = i - 7 // 8->0 ... 25->17
                 if (mapIdx in mapping.indices) {
                     results.add("$i: ${mapping[mapIdx]}")
                 }
