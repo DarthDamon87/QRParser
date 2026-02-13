@@ -34,7 +34,7 @@ class MainActivity : AppCompatActivity() {
         "7C0.008.103.B", // 16
         "7C0.008.103.C", // 17
         "7CA.008.088",   // 18
-        "7CA.008.008.A", // 19 (jeśli powinno być 7CA.008.088.A — daj znać)
+        "7CA.008.008.A", // 19
         "7LE.008.084",   // 20
         "7CA.008.088.C", // 21
         "7C0.008.106",   // 22
@@ -138,13 +138,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Pozycje 8..25 liczone OD LEWEJ (1‑indeksowane) z offsetem:
-        val OFFSET_FROM_LEFT = 5
+        val OFFSET_FROM_LEFT = 4
 
         val results = mutableListOf<String>()
         for (i in 8..25) {
             val idx = i - OFFSET_FROM_LEFT  // i (1‑indeksowane) -> indeks w stringu (0‑indeksowany)
             if (idx in bitString.indices && bitString[idx] == '1') {
-                val mapIdx = i - 7 // 8->0 ... 25->17
+                val mapIdx = i - 8 // 8->0 ... 25->17
                 if (mapIdx in mapping.indices) {
                     results.add("$i: ${mapping[mapIdx]}")
                 }
