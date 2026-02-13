@@ -146,7 +146,7 @@ class MainActivity : AppCompatActivity() {
         for (i in 8..25) {
             val idx = i - OFFSET_FROM_LEFT
             if (idx in bitString.indices && bitString[idx] == '1') {
-                val mapIdx = i - 8 // 8->0 ... 25->17
+                val mapIdx = i - 7 // 8->0 ... 25->17
                 if (mapIdx in mapping.indices) {
                     results.add("$i: ${mapping[mapIdx]}")
                 }
