@@ -3,7 +3,10 @@ package com.example.qrparser
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -16,6 +19,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var tvSequence: TextView
     private lateinit var tvVariants: TextView
+    private lateinit var imgContainer: LinearLayout
 
     // Mapa pozycji 8..25 -> symbol (18 pozycji)
     private val mapping: List<String> = listOf(
@@ -39,11 +43,25 @@ class MainActivity : AppCompatActivity() {
         "7C5.008.085"    // 25
     )
 
+    // Mapowanie kodów na zasoby rysunków (pliki w res/drawable/)
+    private val imageByCode: Map<String, Int> = mapOf(
+        "7C0.008.103"   to R.drawable.img_7c0_008_103,
+        "7C0.008.103.A" to R.drawable.img_7c0_008_103_a,
+        "7C0.008.103.B" to R.drawable.img_7c0_008_103_b,
+        "7C0.008.103.C" to R.drawable.img_7c0_008_103_c,
+        "7CA.008.088"   to R.drawable.img_7ca_008_088,
+        "7CA.008.088.C" to R.drawable.img_7ca_008_088_c,
+        "7C4.008.085"   to R.drawable.img_7c4_008_085,
+        "7C5.008.085"   to R.drawable.img_7c5_008_085
+    )
+
     // ZXing launcher
     private val barcodeLauncher = registerForActivityResult(ScanContract()) { result: ScanIntentResult ->
         if (result.contents == null) {
             tvSequence.text = "-"
             tvVariants.text = "Anulowano lub brak danych."
+            imgContainer.visibility = View.GONE
+            imgContainer.removeAllViews()
         } else {
             handleScannedText(result.contents)
         }
@@ -57,35 +75,28 @@ class MainActivity : AppCompatActivity() {
             startScan()
         } else {
             tvVariants.text = "Brak uprawnienia do kamery."
+            imgContainer.visibility = View.GONE
+            imgContainer.removeAllViews()
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Blokada orientacji jest w AndroidManifest.xml:
-        // <activity ... android:screenOrientation="portrait" />
+        // Blokada orientacji jest w AndroidManifest.xml (android:screenOrientation="portrait")
         setContentView(R.layout.activity_main)
 
         val btnScan = findViewById<Button>(R.id.btnScan)
         tvSequence = findViewById(R.id.tvSequence)
         tvVariants = findViewById(R.id.tvVariants)
+        imgContainer = findViewById(R.id.imgContainer)
 
-        btnScan.setOnClickListener {
-            ensureCameraAndScan()
-        }
+        btnScan.setOnClickListener { ensureCameraAndScan() }
     }
 
     private fun ensureCameraAndScan() {
-        val granted = ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.CAMERA
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (granted) {
-            startScan()
-        } else {
-            requestPermissionLauncher.launch(Manifest.permission.CAMERA)
-        }
+        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED
+        if (granted) startScan() else requestPermissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
     private fun startScan() {
@@ -106,6 +117,8 @@ class MainActivity : AppCompatActivity() {
         if (parts.size < 4) {
             tvSequence.text = "-"
             tvVariants.text = "Nieprawidłowy format: $raw"
+            imgContainer.visibility = View.GONE
+            imgContainer.removeAllViews()
             return
         }
 
@@ -119,30 +132,64 @@ class MainActivity : AppCompatActivity() {
         // Walidacja segmentu bitów
         if (bitString.length != 22 || bitString.any { it != '0' && it != '1' }) {
             tvVariants.text = "Błędny segment bitów (oczekiwane 22 znaki 0/1): $bitString"
+            imgContainer.visibility = View.GONE
+            imgContainer.removeAllViews()
             return
         }
 
-        // --- KLUCZOWE: stały offset względem LEWEJ krawędzi, aby mapowanie 8..25 zgadzało się z Twoją tabelą.
-        // Dla przykładu: "0000000001100000000001" -> chcemy 15 i 16 (a nie 10 i 11),
-        // co implikuje OFFSET_FROM_LEFT = 4 (pos 15 -> idx 10, pos 16 -> idx 11).
-        val OFFSET_FROM_LEFT = 4
+        // Pozycje 8..25 liczone OD LEWEJ (1‑indeksowane).
+        // Aby z Twojego przykładu „11” trafiło w 15 i 16 (a nie 10 i 11), stosujemy stały offset:
+        // i -> idx = i - OFFSET_FROM_LEFT (bez -1, bo pozycje są 1‑indeksowane).
+        val OFFSET_FROM_LEFT = 5
 
         val results = mutableListOf<String>()
         for (i in 8..25) {
-            val idx = (i - 1) - OFFSET_FROM_LEFT // pozycja i (od lewej) -> indeks w bitString z offsetem
-
+            val idx = i - OFFSET_FROM_LEFT
             if (idx in bitString.indices && bitString[idx] == '1') {
-                val mapIdx = i - 7 // 8->0 ... 25->17
+                val mapIdx = i - 8 // 8->0 ... 25->17
                 if (mapIdx in mapping.indices) {
                     results.add("$i: ${mapping[mapIdx]}")
                 }
             }
         }
 
+        // Tekst wyników
         tvVariants.text = if (results.isEmpty()) {
             "Brak dopasowań (w pozycjach 8-25 nie ma '1')."
         } else {
             results.joinToString(separator = "\n")
         }
+
+        // ====== WYŚWIETLANIE WIELU ZDJĘĆ (jedno pod drugim) ======
+        // Z linii "i: KOD" wyciągamy kody i mapujemy do zasobów; bez duplikatów, w kolejności.
+        val imageResList: List<Int> = results.mapNotNull { line ->
+            val code = line.substringAfter(": ").trim()
+            imageByCode[code]
+        }.distinct()
+
+        imgContainer.removeAllViews()
+        if (imageResList.isNotEmpty()) {
+            imgContainer.visibility = View.VISIBLE
+            for (resId in imageResList) {
+                val iv = ImageView(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).also { lp ->
+                        if (lp is LinearLayout.LayoutParams) {
+                            lp.setMargins(0, dp(8), 0, dp(8))
+                        }
+                    }
+                    adjustViewBounds = true
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    setImageResource(resId)
+                }
+                imgContainer.addView(iv)
+            }
+        } else {
+            imgContainer.visibility = View.GONE
+        }
     }
+
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 }
