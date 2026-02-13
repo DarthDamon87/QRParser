@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Tło przez adaptive icon, tu prosty symbol QR -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M20,20h24v24H20z M28,28h8v8h-8z M44,20h24v24H44z M52,28h8v8h-8z
+                          M20,44h24v24H20z M28,52h8v8h-8z M52,44h8v8h-8z M44,52h8v8h-8z" />
+</vector>
